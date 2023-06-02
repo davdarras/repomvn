@@ -8,7 +8,7 @@ public class Constants {
 
 	/**
 	 * Coonstructor for Constants
-	 * @param plop plop variable hehe
+	 * @param plop plop variable
 	 */
 	public Constants(String plop) {
 		this.plop = plop;
