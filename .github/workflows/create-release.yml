@@ -1,0 +1,107 @@
+name: Create release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      release-version: ${{ steps.version.outputs.version }}
+      is-tag-correct: ${{ steps.check-tag.outputs.is-tag-correct }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get version
+        id: version
+        run: echo "version=$(mvn -f pom.xml help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+
+      - name: Print version
+        run: echo ${{ steps.version.outputs.version }}
+
+      - uses: mukunku/tag-exists-action@v1.2.0
+        id: check-tag-exists
+        with:
+          tag: ${{ steps.version.outputs.version }}
+
+      - if: ${{ steps.check-tag-exists.outputs.exists == 'true' }}
+        name: Skip release, tag already exists
+        run: echo "Nothing to tag/release, the release ${{ steps.version.outputs.version }} already exists"
+
+      - if: ${{ steps.check-tag-exists.outputs.exists == 'false' }}
+        name: Check tag format
+        id: check-tag-format
+        run: |
+          if [[ ${{ steps.version.outputs.version }} !~ ^[0-9]\+\.[0-9]\+\.[0-9]\+$ ]]; then
+              echo "is-tag-format-incorrect=true" >> $GITHUB_OUTPUT
+          fi
+
+      - if: ${{ steps.check-tag-format.outputs.is-tag-format-incorrect == 'true' }}
+        name: Skip release
+        run: echo "Nothing to tag/release, the tag ${{ steps.version.outputs.version }} is not in correct format X.Y.Z
+
+      - name: Check if tag is correct
+        id: check-tag
+        run: |
+          if [[ ${{ steps.check-tag-format.outputs.is-tag-format-incorrect }} == 'true' || ${{ steps.check-tag-exists.outputs.exists }} == 'true' ]]; then
+              echo "is-tag-correct=false" >> $GITHUB_OUTPUT
+          else
+            echo "is-tag-correct=true" >> $GITHUB_OUTPUT
+          fi
+
+  create-release:
+    needs: check-version
+    runs-on: ubuntu-latest
+    if: ${{ needs.check-tag.outputs.is-tag-correct == 'true' }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Get previous final release tag
+        id: previousTag
+        run: echo "previousTag=$(git --no-pager tag --sort=creatordate --merged ${{ github.ref_name }} | grep '^[0-9]\+\.[0-9]\+\.[0-9]\+$' | tail -1)" >> $GITHUB_OUTPUT
+
+      - name: Create release note
+        id: changelog
+        uses: requarks/changelog-action@v1
+        with:
+          fromTag: ${{ github.sha }}
+          toTag: ${{ steps.previousTag.outputs.previousTag}}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          writeToFile: false
+
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.check-version.outputs.release-version }}
+          target_commitish: ${{ github.head_ref || github.ref }}
+          name: ${{ needs.check-version.outputs.release-version }}
+          body: ${{steps.changelog.outputs.changes}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ needs.check-tag.outputs.is-tag-correct == 'true' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Maven Central Repository
+        uses: actions/setup-java@v3
+        with:
+          java-version: 11
+          distribution: adopt
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Deploy with Maven
+        run: mvn --batch-mode clean deploy
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
