@@ -6,7 +6,7 @@
 	<artifactId>repomvn</artifactId>
 	<packaging>jar</packaging>
 
-	<version>2.3.3</version>
+	<version>2.3.4</version>
 
 	<name>repomvn</name>
 	<description>A demo for deployment to the Central Repository via OSSRH</description>
