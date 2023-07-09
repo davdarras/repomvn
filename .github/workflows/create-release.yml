@@ -36,7 +36,7 @@ jobs:
             echo "is-tag-format-correct=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check if tag is correct
+      - name: Tag verification
         id: check-tag
         run: |
           if [[ "${{ steps.check-tag-exists.outputs.exists }}" == "true" ]]; then
