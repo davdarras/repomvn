@@ -84,7 +84,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy:
-    needs: create-release
+    needs: [create-release, check-version]
     runs-on: ubuntu-latest
     if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
     steps:

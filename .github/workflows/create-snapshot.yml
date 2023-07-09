@@ -68,7 +68,7 @@ jobs:
             })
 
   deploy:
-    needs: create-tag
+    needs: [create-tag, check-version]
     runs-on: ubuntu-latest
     if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
     steps:
