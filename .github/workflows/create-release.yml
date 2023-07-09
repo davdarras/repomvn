@@ -36,28 +36,24 @@ jobs:
         id: check-tag-format
         run: |
           if [[ "${{ steps.version.outputs.version }}" =~ "^[0-9]+.[0-9]+.[0-9]+$" ]]; then
-            echo "is-tag-format-incorrect=true" >> $GITHUB_OUTPUT
-          else
-            echo "is-tag-format-incorrect=false" >> $GITHUB_OUTPUT
+            echo "is-tag-format-correct=true" >> $GITHUB_OUTPUT
           fi
 
-      - if: ${{ steps.check-tag-format.outputs.is-tag-format-incorrect == 'true' }}
+      - if: ${{ steps.check-tag-format.outputs.is-tag-format-correct == 'false' }}
         name: Skip release
         run: echo "Nothing to tag/release, the tag ${{ steps.version.outputs.version }} is not in correct format X.Y.Z
 
       - name: Check if tag is correct
         id: check-tag
         run: |
-          if [[ ${{ steps.check-tag-format.outputs.is-tag-format-incorrect }} == 'true' || ${{ steps.check-tag-exists.outputs.exists }} == 'true' ]]; then
-              echo "is-tag-correct=false" >> $GITHUB_OUTPUT
-          else
+          if [[ "${{ steps.check-tag-format.outputs.is-tag-format-correct }}" == "true" && ${{ steps.check-tag-exists.outputs.exists }} == "false" ]]; then
             echo "is-tag-correct=true" >> $GITHUB_OUTPUT
           fi
 
   create-release:
     needs: check-version
     runs-on: ubuntu-latest
-    if: ${{ needs.check-tag.outputs.is-tag-correct == 'true' }}
+    if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -89,7 +85,7 @@ jobs:
   deploy:
     needs: create-release
     runs-on: ubuntu-latest
-    if: ${{ needs.check-tag.outputs.is-tag-correct == 'true' }}
+    if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up Maven Central Repository
