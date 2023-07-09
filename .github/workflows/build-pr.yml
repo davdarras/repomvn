@@ -105,8 +105,23 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
+  deploy-comment:
+    needs: [deploy-maven-repo, check-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v5
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '👋 Version ${{ needs.check-version.outputs.tag-version }} deployed on maven central repository'
+            })
+
   remove-deploy-label:
-    needs: deploy-maven-repo
+    needs: deploy-comment
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
