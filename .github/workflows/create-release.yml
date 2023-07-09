@@ -69,8 +69,8 @@ jobs:
         id: changelog
         uses: requarks/changelog-action@v1
         with:
-          toTag: ${{ github.sha }}
-          fromTag: ${{ steps.previousTag.outputs.previousTag}}
+          fromTag: ${{ github.sha }}
+          toTag: ${{ steps.previousTag.outputs.previousTag}}
           token: ${{ secrets.GITHUB_TOKEN }}
           writeToFile: false
 
