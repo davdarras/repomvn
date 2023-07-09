@@ -1,0 +1,91 @@
+name: Create release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag-version: ${{ steps.version.outputs.version }}
+      is-tag-correct: ${{ steps.check-tag.outputs.is-tag-correct }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get version
+        id: version
+        run: echo "version=$(mvn -f pom.xml help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+
+      - name: Print version
+        run: echo ${{ steps.version.outputs.version }}
+
+      - uses: mukunku/tag-exists-action@v1.2.0
+        name: Check tag existence
+        id: check-tag-exists
+        with:
+          tag: ${{ steps.version.outputs.version }}
+
+      - if: ${{ steps.check-tag-exists.outputs.exists == 'false' }}
+        name: Check tag format
+        id: check-tag-format
+        run: |
+          if ! [[ "${{ steps.version.outputs.version }}" =~ ^[0-9]+.[0-9]+.[0-9]+-SNAPSHOT$ ]]; then
+            echo "is-tag-format-correct=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Tag verification
+        id: check-tag
+        run: |
+          if [[ "${{ steps.check-tag-exists.outputs.exists }}" == "true" ]]; then
+            echo "Nothing to tag/release, the tag ${{ steps.version.outputs.version }} already exists"
+            exit 1
+          fi
+
+          if [[ "${{ steps.check-tag-format.outputs.is-tag-format-correct }}" == "false" ]]; then
+            echo "Nothing to tag/release, the tag ${{ steps.version.outputs.version }} is not in correct format X.Y.Z-SNAPSHOT"
+            exit 1
+          fi
+
+          echo "is-tag-correct=true" >> $GITHUB_OUTPUT
+
+  create-tag:
+    needs: check-version
+    runs-on: ubuntu-latest
+    if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
+    steps:
+      - name: Create tag
+        uses: actions/github-script@v5
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ needs.check-version.outputs.tag-version }}',
+              sha: context.sha
+            })
+
+  deploy:
+    needs: create-tag
+    runs-on: ubuntu-latest
+    if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Maven Central Repository
+        uses: actions/setup-java@v3
+        with:
+          java-version: 11
+          distribution: adopt
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Deploy with Maven
+        run: mvn --batch-mode clean deploy
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
