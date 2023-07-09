@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    if: ! contains(github.event.pull_request.labels.*.name, 'deploy-snapshot')
+    if:  ${{ ! contains(github.event.pull_request.labels.*.name, 'deploy-snapshot') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -22,7 +22,7 @@ jobs:
 
   # begin the snapshot verification before deployment
   check-version:
-    if: contains(github.event.pull_request.labels.*.name, 'deploy-snapshot')
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy-snapshot') }}
     runs-on: ubuntu-latest
     outputs:
       tag-version: ${{ steps.version.outputs.version }}
