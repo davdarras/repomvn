@@ -83,7 +83,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy:
+  deploy-maven-repo:
     needs: [create-release, check-version]
     runs-on: ubuntu-latest
     if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
