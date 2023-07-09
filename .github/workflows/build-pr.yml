@@ -1,4 +1,4 @@
-name: Create release
+name: Build PR / Deploy snapshot
 
 on:
   pull_request:
@@ -6,7 +6,6 @@ on:
 
 jobs:
   build:
-    if: ${{ github.event.label.name != 'deploy-snapshot' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -20,6 +19,7 @@ jobs:
       - name: Build & Tests
         run: mvn package --no-transfer-progress
 
+  # begin the snapshot verification before deployment
   check-version:
     if: ${{ github.event.label.name == 'deploy-snapshot' }}
     runs-on: ubuntu-latest
