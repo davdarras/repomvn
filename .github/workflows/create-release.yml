@@ -45,7 +45,7 @@ jobs:
           fi
 
           if [[ "${{ steps.check-tag-format.outputs.is-tag-format-correct }}" == "false" ]]; then
-            echo "Nothing to tag/release, the tag ${{ steps.version.outputs.version }} is not in correct format X.Y.Z
+            echo "Nothing to tag/release, the tag ${{ steps.version.outputs.version }} is not in correct format X.Y.Z"
             exit 1
           fi
 
