@@ -1,4 +1,4 @@
-name: Create release
+name: Build PR / Deploy snapshot
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    if: ${{ github.event.label.name != 'deploy-snapshot' }}
+    if:  ${{ ! contains(github.event.pull_request.labels.*.name, 'deploy-snapshot') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -20,8 +20,9 @@ jobs:
       - name: Build & Tests
         run: mvn package --no-transfer-progress
 
+  # begin the snapshot verification before deployment
   check-version:
-    if: ${{ github.event.label.name == 'deploy-snapshot' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy-snapshot') }}
     runs-on: ubuntu-latest
     outputs:
       tag-version: ${{ steps.version.outputs.version }}
@@ -72,7 +73,7 @@ jobs:
     if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
     steps:
       - name: Create tag
-        uses: actions/github-script@v5
+        uses: actions/github-script@v6
         with:
           script: |
             github.rest.git.createRef({
@@ -105,8 +106,22 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
+  deploy-comment:
+    needs: [deploy-maven-repo, check-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '👋 Version ${{ needs.check-version.outputs.tag-version }} deployed on maven central repository'
+            })
+
   remove-deploy-label:
-    needs: deploy-maven-repo
+    needs: deploy-comment
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
