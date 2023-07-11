@@ -5,14 +5,12 @@ on:
     types: [opened, edited, synchronize, reopened, labeled]
 
 jobs:
-
   # begin the snapshot verification before deployment
   check-version:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy-snapshot') }}
     runs-on: ubuntu-latest
     outputs:
       tag-version: ${{ steps.version.outputs.version }}
-      is-tag-correct: ${{ steps.check-tag.outputs.is-tag-correct }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -28,15 +26,7 @@ jobs:
         name: Check tag existence
         id: check-tag-exists
         with:
-          tag: ${{ steps.version.outputs.version }}
-
-      - if: ${{ steps.check-tag-exists.outputs.exists == 'false' }}
-        name: Check tag format
-        id: check-tag-format
-        run: |
-          if ! [[ "${{ steps.version.outputs.version }}" =~ ^[0-9]+.[0-9]+.[0-9]+-SNAPSHOT$ ]]; then
-            echo "is-tag-format-correct=false" >> $GITHUB_OUTPUT
-          fi
+          tag: ${{ steps.version.outputs.version }}          
 
       - name: Tag verification
         id: check-tag
@@ -46,17 +36,14 @@ jobs:
             exit 1
           fi
 
-          if [[ "${{ steps.check-tag-format.outputs.is-tag-format-correct }}" == "false" ]]; then
+          if ! [[ "${{ steps.version.outputs.version }}" =~ ^[0-9]+.[0-9]+.[0-9]+-SNAPSHOT$ ]]; then
             echo "Nothing to tag/release, the tag ${{ steps.version.outputs.version }} is not in correct format X.Y.Z-SNAPSHOT"
             exit 1
           fi
 
-          echo "is-tag-correct=true" >> $GITHUB_OUTPUT
-
   test:
     needs: check-version
     runs-on: ubuntu-latest
-    if: ${{ needs.check-version.outputs.is-tag-correct == 'true' }}
     steps:
       - uses: actions/checkout@v3
 
@@ -70,7 +57,7 @@ jobs:
         run: mvn test --no-transfer-progress
 
   create-tag:
-    needs: test
+    needs: [ test, check-version ]
     runs-on: ubuntu-latest
     steps:
       - name: Create tag
@@ -107,7 +94,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
   deploy-comment:
-    needs: deploy-maven-repo
+    needs: [ deploy-maven-repo, check-version ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v6
